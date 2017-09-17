@@ -2,7 +2,7 @@
 #include <cmath>
 
 //Parameters for Kalman Filter
-#define Q1 4e-3
+#define Q1 0.004
 #define R1 0.5
 
 //To see the results of before and after stabilization simultaneously
