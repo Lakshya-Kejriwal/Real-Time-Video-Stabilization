@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     VideoStab stab;
 
     //Initialize the VideoCapture object
-    VideoCapture cap("/home/lakshya/Downloads/KalmanFilter/Unstabilized video 200mm lens.mp4");
+    VideoCapture cap(0);
 
     Mat frame_2, frame2;
     Mat frame_1, frame1;
