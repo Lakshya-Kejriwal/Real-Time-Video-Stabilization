@@ -17,9 +17,3 @@ The code requires the following 3rd Party Libraries
 - Change the parameters of Kalman Filter in `videostab.cpp`. (optional)
 - Give the path of your input file or webcam in `main.cpp`.
 - Run the program
-
-
-### License
-
-- For academic and non-commercial purposes only
-
