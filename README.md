@@ -16,4 +16,4 @@ The code requires the following 3rd Party Libraries
 - Clone the repository and compile using `g++` and `opencv`.
 - Change the parameters of Kalman Filter in `videostab.cpp`. (optional)
 - Give the path of your input file or webcam in `main.cpp`.
-- Run the program
+- Run the program using these dependencies: -lopencv_core -lopencv_calib3d -lopencv_imgcodecs -lopencv_highgui -lopencv_imgproc -lopencv_stitching -lopencv_videoio -lopencv_video -lopencv_xfeatures2d
