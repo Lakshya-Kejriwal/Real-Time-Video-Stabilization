@@ -15,12 +15,26 @@
 using namespace std;
 using namespace cv;
 
+// This class redirects cv::Exception to our process so that we can catch it and handle it accordingly.
+class cvErrorRedirector {
+public:
+    int cvCustomErrorCallback( )
+    {
+        std::cout << "A cv::Exception has been caught. Skipping this frame..." << std::endl;
+        return 0;
+    }
+
+    cvErrorRedirector() {
+        cvRedirectError((cv::ErrorCallback)cvCustomErrorCallback(), this);
+    }
+};
 
 const int HORIZONTAL_BORDER_CROP = 30;
 
 int main(int argc, char **argv)
 {
-
+    cvErrorRedirector redir;
+    
     //Create a object of stabilization class
     VideoStab stab;
 
@@ -40,28 +54,32 @@ int main(int argc, char **argv)
 
     while(true)
     {
+        try {
+            cap >> frame_2;
 
-        cap >> frame_2;
+            if(frame_2.data == NULL)
+            {
+                break;
+            }
 
-        if(frame_2.data == NULL)
-        {
-            break;
+            cvtColor(frame_2, frame2, COLOR_BGR2GRAY);
+
+            Mat smoothedFrame;
+
+            smoothedFrame = stab.stabilize(frame_1 , frame_2);
+
+            outputVideo.write(smoothedFrame);
+
+            imshow("Stabilized Video" , smoothedFrame);
+
+            waitKey(10);
+
+            frame_1 = frame_2.clone();
+            frame2.copyTo(frame1);
+        } catch (cv::Exception& e) {
+            cap >> frame_1;
+            cvtColor(frame_1, frame1, COLOR_BGR2GRAY);
         }
-
-        cvtColor(frame_2, frame2, COLOR_BGR2GRAY);
-
-        Mat smoothedFrame;
-
-        smoothedFrame = stab.stabilize(frame_1 , frame_2);
-
-        outputVideo.write(smoothedFrame);
-
-        imshow("Stabilized Video" , smoothedFrame);
-
-        waitKey(10);
-
-        frame_1 = frame_2.clone();
-        frame2.copyTo(frame1);
 
     }
 
