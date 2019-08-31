@@ -1,14 +1,16 @@
-#include "videostab.h"
+#include "AffineKalmanLP.h"
 #include <cmath>
+#include <vector>
 
 //Parameters for Kalman Filter
 #define Q1 0.004
 #define R1 0.5
 
 //To see the results of before and after stabilization simultaneously
-#define test 1
+#define test                0
+#define movement_detect     1
 
-VideoStab::VideoStab()
+AKLP_VideoStab::AKLP_VideoStab()
 {
 
     smoothedMat.create(2 , 3 , CV_64F);
@@ -45,41 +47,64 @@ VideoStab::VideoStab()
     transX = 0;
     transY = 0;
 
+    cv::RNG rng;
+    for(int i = 0; i < 100; i++)
+    {
+        int r = rng.uniform(0, 256);
+        int g = rng.uniform(0, 256);
+        int b = rng.uniform(0, 256);
+        colors.push_back(cv::Scalar(r,g,b));
+    }
+    
+    p_diff_x = 0;
+    p_diff_y = 0;
 }
 
 //The main stabilization function
-Mat VideoStab::stabilize(Mat frame_1, Mat frame_2)
+cv::Mat AKLP_VideoStab::stabilize(cv::Mat frame_1, cv::Mat frame_2)
 {
-    cvtColor(frame_1, frame1, COLOR_BGR2GRAY);
-    cvtColor(frame_2, frame2, COLOR_BGR2GRAY);
+    cv::cvtColor(frame_1, frame1, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(frame_2, frame2, cv::COLOR_BGR2GRAY);
 
     int vert_border = HORIZONTAL_BORDER_CROP * frame_1.rows / frame_1.cols;
 
-    vector <Point2f> features1, features2;
-    vector <Point2f> goodFeatures1, goodFeatures2;
-    vector <uchar> status;
-    vector <float> err;
+    std::vector <cv::Point2f> features1, features2;
+    std::vector <cv::Point2f> goodFeatures1, goodFeatures2;
+    std::vector <uchar> status;
+    std::vector <float> err;
 
     //Estimating the features in frame1 and frame2
-    goodFeaturesToTrack(frame1, features1, 200, 0.01  , 30 );
-    calcOpticalFlowPyrLK(frame1, frame2, features1, features2, status, err );
+    cv::goodFeaturesToTrack(frame1, features1, 200, 0.01  , 30 );
+    cv::calcOpticalFlowPyrLK(frame1, frame2, features1, features2, status, err );
 
+    cv::Point2f p_diff(0.0, 0.0);
+    // Create a mask image for drawing purposes
+    cv::Mat mask = cv::Mat::zeros(frame_1.size(), frame_1.type());
     for(size_t i=0; i < status.size(); i++)
     {
         if(status[i])
         {
             goodFeatures1.push_back(features1[i]);
             goodFeatures2.push_back(features2[i]);
+            cv::line(mask,features2[i], features1[i], colors[i], 3);
+            cv::circle(frame2, features2[i], 1, colors[i], -1);
+            
+            p_diff += features2[i] - features1[i];
         }
     }
+    
+    p_diff_x = p_diff.x;
+    p_diff_y = p_diff.y;
+    
+    cv::Mat img;
+    cv::add(frame_1, mask, frame_1);
+    //cv::imshow("before and after", img);
 
     //All the parameters scale, angle, and translation are stored in affine
-    affine = estimateRigidTransform(goodFeatures1, goodFeatures2, false);
+    affine = cv::estimateRigidTransform(goodFeatures1, goodFeatures2, false);
 
-    // If an affine transformation is not found, return the most recent frame received.
     if(affine.size().height == 0 || affine.size().width == 0)
-        return frame_2;
-    
+        return frame_1;
     //cout<<affine;
     //flush(cout);
 
@@ -141,25 +166,40 @@ Mat VideoStab::stabilize(Mat frame_1, Mat frame_2)
     warpAffine(frame_1, smoothedFrame, smoothedMat, frame_2.size());
 
     //Crop the smoothed frame a little to eliminate black region due to Kalman Filter
-    smoothedFrame = smoothedFrame(Range(vert_border, smoothedFrame.rows-vert_border), Range(HORIZONTAL_BORDER_CROP, smoothedFrame.cols-HORIZONTAL_BORDER_CROP));
+    smoothedFrame = smoothedFrame(cv::Range(vert_border, smoothedFrame.rows-vert_border), cv::Range(HORIZONTAL_BORDER_CROP, smoothedFrame.cols-HORIZONTAL_BORDER_CROP));
 
     resize(smoothedFrame, smoothedFrame, frame_2.size());
 
     //Change the value of test if you want to see both unstabilized and stabilized video
     if(test)
     {
-        Mat canvas = Mat::zeros(frame_2.rows, frame_2.cols*2+10, frame_2.type());
+        if(movement_detect) {
+            cv::putText(frame_2, 
+                "Here is some text",
+                cv::Point(5,5), // Coordinates
+                cv::FONT_HERSHEY_COMPLEX_SMALL, // Font
+                1.0, // Scale. 2.0 = 2x bigger
+                cv::Scalar(255,255,255), // BGR Color
+                1, // Line Thickness (Optional)
+                8,
+                false); // Anti-alias (Optional)
+        }
+        
+        cv::Mat canvas = cv::Mat::zeros(frame_2.rows, frame_2.cols*2+10, frame_2.type());
 
-        frame_1.copyTo(canvas(Range::all(), Range(0, smoothedFrame.cols)));
+        frame_1.copyTo(canvas(cv::Range::all(), cv::Range(0, smoothedFrame.cols)));
 
-        smoothedFrame.copyTo(canvas(Range::all(), Range(smoothedFrame.cols+10, smoothedFrame.cols*2+10)));
+        smoothedFrame.copyTo(canvas(cv::Range::all(), cv::Range(smoothedFrame.cols+10, smoothedFrame.cols*2+10)));
 
         if(canvas.cols > 1920)
         {
-            resize(canvas, canvas, Size(canvas.cols/2, canvas.rows/2));
+            cv::resize(canvas, canvas, cv::Size(canvas.cols/2, canvas.rows/2));
         }
-        imshow("before and after", canvas);
+        
+        cv::imshow("before and after", canvas);
     }
+    
+    
 
     return smoothedFrame;
 
@@ -167,7 +207,7 @@ Mat VideoStab::stabilize(Mat frame_1, Mat frame_2)
 
 
 //Kalman Filter implementation
-void VideoStab::Kalman_Filter(double *scaleX , double *scaleY , double *thetha , double *transX , double *transY)
+void AKLP_VideoStab::Kalman_Filter(double *scaleX , double *scaleY , double *thetha , double *transX , double *transY)
 {
     double frame_1_scaleX = *scaleX;
     double frame_1_scaleY = *scaleY;

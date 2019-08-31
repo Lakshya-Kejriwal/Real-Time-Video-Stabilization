@@ -19,4 +19,4 @@ The code requires the following 3rd Party Libraries
 - Run the program using these dependencies: -lopencv_core -lopencv_calib3d -lopencv_imgcodecs -lopencv_highgui -lopencv_imgproc -lopencv_stitching -lopencv_videoio -lopencv_video -lopencv_xfeatures2d
 
 #### Alternatively
-- The `Linux` branch of this repository includes a Makefile, run `make` to create the executable
+- This repository includes a Makefile, run `make` to create the executable (Works under `Linux`)
